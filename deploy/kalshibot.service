@@ -1,0 +1,28 @@
+[Unit]
+Description=Kalshi BTC trading bot
+After=network-online.target time-sync.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=kalshibot
+Group=kalshibot
+WorkingDirectory=/home/kalshibot/KALSHI
+ExecStart=/home/kalshibot/KALSHI/.venv/bin/python -m kalshibot run
+Restart=always
+RestartSec=10
+# Exit code 3 = kill switch tripped: do NOT auto-restart. Requires a human.
+# Exit code 2 = refused to start (bad config / live not confirmed).
+RestartPreventExitStatus=2 3
+# stop gracefully (cancels resting orders)
+KillSignal=SIGTERM
+TimeoutStopSec=30
+# hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/kalshibot/KALSHI/data
+
+[Install]
+WantedBy=multi-user.target

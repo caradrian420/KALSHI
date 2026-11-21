@@ -1,0 +1,87 @@
+# Kalshi BTC bot configuration. Secrets do NOT go here -- they go in .env.
+#
+# mode:
+#   paper  - LIVE production market data (read-only, no key needed), simulated fills. DEFAULT.
+#   demo   - Kalshi DEMO exchange (fake money) for testing order placement end-to-end.
+#   live   - REAL MONEY. Also requires a typed confirmation (see README) and, by
+#            default, a paper record of >= 300 settled trades with positive net P&L.
+mode: paper
+
+series: [KXBTCD, KXBTC15M]          # hourly above/below, 15-minute up/down
+require_settlement_source: "CF Benchmarks"   # series not settling on this are disabled
+
+db_path: "data/kalshibot_{mode}.db"
+log_file: "data/kalshibot_{mode}.log"
+log_level: INFO
+
+risk:
+  starting_bankroll: 20.0
+  max_risk_per_trade: 1.0           # cost + fees of a single order
+  max_open_positions: 3
+  daily_loss_limit: 4.0             # worst-case enforced; halts until local midnight
+  kill_switch_bankroll: 10.0        # equity <= this -> stop, manual reset required
+  kill_switch_preemptive: true
+  min_seconds_to_expiry: 60
+  max_spread: 0.10
+  min_price: 0.05                   # don't trade contracts priced below/above these
+  max_price: 0.95
+  order_ttl_seconds: 30             # resting (maker) orders cancelled after this
+  day_timezone: America/New_York
+  max_trades_per_market: 1
+
+strategy:
+  min_edge: 0.04                    # dollars per contract after fee + slippage buffer
+  slippage_buffer: 0.01
+  vol_window_minutes: 60
+  vol_method: stdev                 # stdev | ewma
+  ewma_lambda: 0.94
+  vol_floor_annual: 0.20
+  vol_cap_annual: 3.00
+  vol_multiplier: 1.0               # >1.0 = more conservative (fatter tails)
+  settlement_avg_seconds: 60        # BRTI averaged over the 60s before close
+  basis_uncertainty_usd: 15.0       # our free-feed spot vs BRTI, modelled as noise
+  max_minutes_to_expiry: 75
+  order_style: taker                # taker | maker | auto (paper always simulates taker)
+  max_feed_divergence_pct: 0.25     # skip trading if spot sources disagree by more
+  max_spot_age_seconds: 15
+  min_vol_samples: 30
+
+fees:
+  taker_rate: 0.07
+  maker_rate: 0.0175
+  apply_series_multiplier: true     # multiply by series fee_multiplier (never below 1x)
+  ignore_fee_waivers: true          # true = still charge fees during promo waivers (conservative)
+
+feeds:
+  sources: [coinbase, kraken, bitstamp]   # median of these = BRTI proxy (also: gemini)
+  vol_source: coinbase
+  timeout_seconds: 5
+
+api:
+  prod_base_url: "https://api.elections.kalshi.com/trade-api/v2"
+  demo_base_url: "https://demo-api.kalshi.co/trade-api/v2"
+  reads_per_second: 10              # well under Kalshi's Basic-tier budget
+  writes_per_second: 5
+  timeout_seconds: 10
+  max_retries: 5
+  backoff_base_seconds: 0.5
+  backoff_max_seconds: 30
+  max_clock_drift_seconds: 2.0
+  orderbook_depth: 10
+
+loop:
+  poll_seconds: 5
+  market_refresh_seconds: 15
+  vol_refresh_seconds: 60
+  snapshot_minutes: 15
+  signal_log_seconds: 60            # skipped signals: log each market at most this often
+  record_market_data: true          # needed for the replay/backtest
+  settle_check_seconds: 60
+
+live:
+  min_paper_trades: 300
+  require_positive_paper_pnl: true
+  override_paper_gate: false
+  confirmation_phrase: "I UNDERSTAND THIS TRADES REAL MONEY"
+  armed_file: "data/LIVE_ARMED"
+  armed_valid_hours: 24             # 0 = arming never expires
